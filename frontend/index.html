@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitor BLE - Dispositivos Cercanos</title>
+    <title>Monitor BLE - Sistema ESP32 + Pico W</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
     <style>
         * {
@@ -21,7 +21,7 @@
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             background: rgba(255, 255, 255, 0.95);
             border-radius: 20px;
@@ -44,21 +44,55 @@
             -webkit-text-fill-color: transparent;
         }
 
+        .header .subtitle {
+            color: #718096;
+            font-size: 1.1em;
+            margin-bottom: 5px;
+        }
+
+        .system-badge {
+            display: inline-block;
+            background: linear-gradient(45deg, #48bb78, #38a169);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+
         .status-bar {
-            display: flex;
-            justify-content: space-between;
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
             align-items: center;
             background: #f7fafc;
-            padding: 15px 20px;
-            border-radius: 12px;
+            padding: 20px 25px;
+            border-radius: 15px;
             margin-bottom: 25px;
             border-left: 4px solid #48bb78;
+            gap: 20px;
         }
 
         .status-indicator {
             display: flex;
             align-items: center;
             gap: 8px;
+        }
+
+        .system-indicators {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .system-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9em;
+            background: white;
+            padding: 8px 12px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
 
         .status-dot {
@@ -71,6 +105,21 @@
 
         .status-dot.disconnected {
             background: #f56565;
+        }
+
+        .status-dot.warning {
+            background: #ed8936;
+        }
+
+        .system-indicator .status-dot {
+            width: 8px;
+            height: 8px;
+        }
+
+        .status-info {
+            text-align: right;
+            font-size: 0.9em;
+            color: #718096;
         }
 
         @keyframes pulse {
@@ -138,17 +187,31 @@
             background: linear-gradient(135deg, #f0fff4 0%, #e6fffa 100%);
         }
 
+        .device-source {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(102, 126, 234, 0.1);
+            color: #667eea;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.7em;
+            font-weight: 500;
+        }
+
         .device-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 12px;
+            margin-bottom: 15px;
         }
 
         .device-name {
             font-weight: 600;
             font-size: 1.1em;
             color: #2d3748;
+            max-width: 60%;
+            word-break: break-word;
         }
 
         .priority-toggle {
@@ -210,6 +273,9 @@
         .info-value {
             font-weight: 600;
             color: #2d3748;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .distance-badge {
@@ -235,6 +301,29 @@
             color: #c53030;
         }
 
+        .signal-strength {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            margin-left: 8px;
+        }
+
+        .signal-bar {
+            width: 3px;
+            background: #cbd5e0;
+            border-radius: 1px;
+            transition: background 0.3s ease;
+        }
+
+        .signal-bar.active {
+            background: #48bb78;
+        }
+
+        .signal-bar:nth-child(1) { height: 8px; }
+        .signal-bar:nth-child(2) { height: 12px; }
+        .signal-bar:nth-child(3) { height: 16px; }
+        .signal-bar:nth-child(4) { height: 20px; }
+
         .notifications-list {
             max-height: 400px;
             overflow-y: auto;
@@ -246,6 +335,7 @@
             margin-bottom: 10px;
             border-left: 4px solid;
             animation: slideIn 0.3s ease;
+            position: relative;
         }
 
         @keyframes slideIn {
@@ -269,6 +359,17 @@
             background: #fed7d7;
             border-color: #e53e3e;
             color: #c53030;
+        }
+
+        .notification-source {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.1);
+            padding: 2px 6px;
+            border-radius: 8px;
+            font-size: 0.7em;
+            color: #718096;
         }
 
         .notification-meta {
@@ -303,6 +404,9 @@
             cursor: pointer;
             transition: all 0.3s ease;
             font-size: 0.9em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .btn-primary {
@@ -315,9 +419,20 @@
             color: #4a5568;
         }
 
+        .btn-danger {
+            background: linear-gradient(45deg, #f56565, #e53e3e);
+            color: white;
+        }
+
         .btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
         }
 
         .stats-grid {
@@ -334,6 +449,11 @@
             text-align: center;
             border: 1px solid #e2e8f0;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
         }
 
         .stat-number {
@@ -371,6 +491,77 @@
             100% { transform: rotate(360deg); }
         }
 
+        .alert {
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border-left: 4px solid;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .alert-warning {
+            background: #fef5e7;
+            border-color: #ed8936;
+            color: #c05621;
+        }
+
+        .alert-error {
+            background: #fed7d7;
+            border-color: #e53e3e;
+            color: #c53030;
+        }
+
+        .system-health {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .health-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .health-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: #f8fafc;
+            border-radius: 8px;
+        }
+
+        .health-status {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .health-status.healthy {
+            background: #48bb78;
+        }
+
+        .health-status.unhealthy {
+            background: #f56565;
+        }
+
+        @media (max-width: 1024px) {
+            .status-bar {
+                grid-template-columns: 1fr;
+                gap: 15px;
+                text-align: center;
+            }
+
+            .system-indicators {
+                justify-content: center;
+            }
+        }
+
         @media (max-width: 768px) {
             .main-grid {
                 grid-template-columns: 1fr;
@@ -393,6 +584,16 @@
             .controls {
                 justify-content: center;
             }
+
+            .device-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+
+            .device-name {
+                max-width: 100%;
+            }
         }
     </style>
 </head>
@@ -400,7 +601,8 @@
     <div class="container">
         <div class="header">
             <h1>🔵 Monitor BLE</h1>
-            <p>Monitoreo en tiempo real de dispositivos Bluetooth Low Energy</p>
+            <p class="subtitle">Sistema distribuido de monitoreo Bluetooth Low Energy</p>
+            <div class="system-badge">ESP32 + Raspberry Pi Pico W</div>
         </div>
 
         <div class="status-bar">
@@ -408,9 +610,29 @@
                 <div class="status-dot" id="connectionStatus"></div>
                 <span id="connectionText">Conectando...</span>
             </div>
-            <div class="status-info">
-                <span id="lastUpdate">Última actualización: --</span>
+            
+            <div class="system-indicators">
+                <div class="system-indicator">
+                    <span>🔷 ESP32</span>
+                    <div class="status-dot" id="esp32Status"></div>
+                    <span id="esp32Text">Verificando...</span>
+                </div>
+                <div class="system-indicator">
+                    <span>🟢 Pico W</span>
+                    <div class="status-dot" id="picoStatus"></div>
+                    <span id="picoText">Verificando...</span>
+                </div>
             </div>
+            
+            <div class="status-info">
+                <div id="lastUpdate">Última actualización: --</div>
+                <div id="systemUptime">Tiempo activo: --</div>
+            </div>
+        </div>
+
+        <div id="systemAlert" class="alert alert-warning" style="display: none;">
+            <span>⚠️</span>
+            <span id="alertMessage"></span>
         </div>
 
         <div class="stats-grid">
@@ -426,14 +648,25 @@
                 <div class="stat-number" id="closeDevices">0</div>
                 <div class="stat-label">Cercanos (&lt;2m)</div>
             </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalScans">0</div>
+                <div class="stat-label">Escaneos</div>
+            </div>
         </div>
 
         <div class="main-grid">
             <div class="devices-section">
                 <div class="section-title">📱 Dispositivos Detectados</div>
                 <div class="controls">
-                    <button class="btn btn-primary" onclick="refreshDevices()">🔄 Actualizar</button>
-                    <button class="btn btn-secondary" onclick="clearAllPriorities()">❌ Limpiar Prioridades</button>
+                    <button class="btn btn-primary" onclick="refreshDevices()">
+                        🔄 Actualizar
+                    </button>
+                    <button class="btn btn-secondary" onclick="clearAllPriorities()">
+                        ❌ Limpiar Prioridades
+                    </button>
+                    <button class="btn btn-secondary" onclick="requestSystemStats()">
+                        📊 Estadísticas
+                    </button>
                 </div>
                 <div class="devices-list" id="devicesList">
                     <div class="loading">
@@ -445,7 +678,9 @@
             <div class="notifications-section">
                 <div class="section-title">🔔 Notificaciones</div>
                 <div class="controls">
-                    <button class="btn btn-secondary" onclick="clearNotifications()">🗑️ Limpiar</button>
+                    <button class="btn btn-danger" onclick="clearNotifications()">
+                        🗑️ Limpiar
+                    </button>
                 </div>
                 <div class="notifications-list" id="notificationsList">
                     <div class="empty-state">
@@ -455,11 +690,31 @@
                 </div>
             </div>
         </div>
+
+        <div class="system-health">
+            <h3 style="margin-bottom: 15px; color: #2d3748;">🏥 Estado del Sistema</h3>
+            <div class="health-grid" id="systemHealthGrid">
+                <div class="health-item">
+                    <div class="health-status" id="esp32Health"></div>
+                    <div>
+                        <div style="font-weight: 600;">ESP32 Scanner</div>
+                        <div style="font-size: 0.8em; color: #718096;" id="esp32LastSeen">--</div>
+                    </div>
+                </div>
+                <div class="health-item">
+                    <div class="health-status" id="picoHealth"></div>
+                    <div>
+                        <div style="font-weight: 600;">Pico W Backend</div>
+                        <div style="font-size: 0.8em; color: #718096;" id="picoLastSeen">--</div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
         // Configuración
-        const BACKEND_URL = 'https://contenido-esp.onrender.com'; // Cambiar por tu URL de Render
+        const BACKEND_URL = 'https://contenido-esp.onrender.com';
         
         // Variables globales
         let socket;
@@ -467,12 +722,20 @@
         let priorityDevices = new Set();
         let notifications = [];
         let isConnected = false;
+        let systemStats = {
+            esp32Active: false,
+            picoActive: false,
+            esp32LastSeen: null,
+            picoLastSeen: null,
+            totalScans: 0
+        };
 
         // Inicializar aplicación
         document.addEventListener('DOMContentLoaded', function() {
             initializeSocketConnection();
             loadInitialData();
             setupEventListeners();
+            startPeriodicUpdates();
         });
 
         // Configurar conexión Socket.IO
@@ -480,56 +743,73 @@
             socket = io(BACKEND_URL);
             
             socket.on('connect', function() {
-                console.log('Conectado al servidor');
+                console.log('✅ Conectado al servidor');
                 isConnected = true;
                 updateConnectionStatus(true);
+                hideSystemAlert();
             });
             
             socket.on('disconnect', function() {
-                console.log('Desconectado del servidor');
+                console.log('❌ Desconectado del servidor');
                 isConnected = false;
                 updateConnectionStatus(false);
+                showSystemAlert('Conexión perdida con el servidor', 'warning');
             });
             
             socket.on('initialData', function(data) {
-                console.log('Datos iniciales recibidos', data);
+                console.log('📥 Datos iniciales recibidos', data);
                 handleInitialData(data);
             });
             
             socket.on('devicesUpdate', function(data) {
-                console.log('Actualización de dispositivos', data);
+                console.log('📱 Actualización de dispositivos', data);
                 handleDevicesUpdate(data.devices);
                 updateLastUpdateTime();
             });
             
             socket.on('priorityUpdate', function(data) {
-                console.log('Actualización de prioridad', data);
+                console.log('⭐ Actualización de prioridad', data);
                 handlePriorityUpdate(data);
             });
             
             socket.on('notification', function(notification) {
-                console.log('Nueva notificación', notification);
+                console.log('🔔 Nueva notificación', notification);
                 handleNewNotification(notification);
+            });
+
+            socket.on('systemStatsUpdate', function(data) {
+                console.log('📊 Actualización de estadísticas', data);
+                updateSystemStatus(data);
+            });
+
+            socket.on('systemAlert', function(data) {
+                console.log('⚠️ Alerta del sistema', data);
+                showSystemAlert(data.message, 'warning');
             });
             
             socket.on('connect_error', function(error) {
-                console.error('Error de conexión:', error);
+                console.error('❌ Error de conexión:', error);
                 updateConnectionStatus(false);
+                showSystemAlert('Error de conexión al servidor', 'error');
             });
         }
 
         // Cargar datos iniciales via HTTP
         async function loadInitialData() {
             try {
-                const [devicesRes, priorityRes, notificationsRes] = await Promise.all([
+                const [devicesRes, priorityRes, notificationsRes, statsRes] = await Promise.all([
                     fetch(`${BACKEND_URL}/api/devices`),
                     fetch(`${BACKEND_URL}/api/priority-devices`),
-                    fetch(`${BACKEND_URL}/api/notifications?limit=20`)
+                    fetch(`${BACKEND_URL}/api/notifications?limit=20`),
+                    fetch(`${BACKEND_URL}/api/system-stats`)
                 ]);
 
                 if (devicesRes.ok) {
                     const devicesData = await devicesRes.json();
                     handleDevicesUpdate(devicesData.devices);
+                    if (devicesData.systemStatus) {
+                        updateSystemStatus(devicesData.systemStatus);
+                    }
                 }
 
                 if (priorityRes.ok) {
@@ -543,8 +823,14 @@
                     renderNotifications();
                 }
 
+                if (statsRes.ok) {
+                    const statsData = await statsRes.json();
+                    updateSystemStats(statsData);
+                }
+
             } catch (error) {
-                console.error('Error cargando datos iniciales:', error);
+                console.error('❌ Error cargando datos iniciales:', error);
+                showSystemAlert('Error cargando datos del servidor', 'error');
             }
         }
 
@@ -560,6 +846,9 @@
                 notifications = data.notifications;
                 renderNotifications();
             }
+            if (data.systemStats) {
+                updateSystemStatus(data.systemStats);
+            }
         }
 
         // Actualizar estado de conexión
@@ -573,6 +862,59 @@
             } else {
                 statusDot.classList.add('disconnected');
                 statusText.textContent = 'Desconectado del servidor';
+            }
+        }
+
+        // Actualizar estado del sistema ESP32/Pico W
+        function updateSystemStatus(data) {
+            const esp32Status = document.getElementById('esp32Status');
+            const esp32Text = document.getElementById('esp32Text');
+            const picoStatus = document.getElementById('picoStatus');
+            const picoText = document.getElementById('picoText');
+            const esp32Health = document.getElementById('esp32Health');
+            const picoHealth = document.getElementById('picoHealth');
+            const esp32LastSeen = document.getElementById('esp32LastSeen');
+            const picoLastSeen = document.getElementById('picoLastSeen');
+
+            systemStats = {...systemStats, ...data};
+
+            // Actualizar ESP32
+            if (data.esp32Active) {
+                esp32Status.classList.remove('disconnected', 'warning');
+                esp32Text.textContent = 'Activo';
+                esp32Health.className = 'health-status healthy';
+                esp32LastSeen.textContent = 'Activo ahora';
+            } else {
+                esp32Status.classList.add('disconnected');
+                esp32Text.textContent = 'Inactivo';
+                esp32Health.className = 'health-status unhealthy';
+                esp32LastSeen.textContent = 'Sin respuesta';
+            }
+
+            // Actualizar Pico W
+            if (data.picoActive) {
+                picoStatus.classList.remove('disconnected', 'warning');
+                picoText.textContent = 'Activo';
+                picoHealth.className = 'health-status healthy';
+                picoLastSeen.textContent = 'Activo ahora';
+            } else {
+                picoStatus.classList.add('disconnected');
+                picoText.textContent = 'Inactivo';
+                picoHealth.className = 'health-status unhealthy';
+                picoLastSeen.textContent = 'Sin respuesta';
+            }
+        }
+
+        // Actualizar estadísticas del sistema
+        function updateSystemStats(data) {
+            if (data.performance && data.performance.totalScans) {
+                document.getElementById('totalScans').textContent = data.performance.totalScans;
+            }
+            
+            if (data.performance && data.performance.uptime) {
+                const hours = Math.floor(data.performance.uptime / 3600);
+                const minutes = Math.floor((data.performance.uptime % 3600) / 60);
+                document.getElementById('systemUptime').textContent = `Tiempo activo: ${hours}h ${minutes}m`;
             }
         }
 
@@ -642,7 +984,7 @@
                     <div class="empty-state">
                         <div class="empty-state-icon">📱</div>
                         <p>No hay dispositivos detectados</p>
-                        <small>Asegúrate de que el ESP32 esté funcionando</small>
+                        <small>Asegúrate de que el ESP32 y Pico W estén funcionando</small>
                     </div>
                 `;
                 return;
@@ -651,11 +993,12 @@
             const devicesArray = Array.from(devices.values()).sort((a, b) => {
                 if (a.isPriority && !b.isPriority) return -1;
                 if (!a.isPriority && b.isPriority) return 1;
-                return a.distance - b.distance;
+                return (a.distance || 5) - (b.distance || 5);
             });
 
             devicesList.innerHTML = devicesArray.map(device => `
                 <div class="device-card ${device.isPriority ? 'priority' : ''}">
+                    <div class="device-source">${device.source || 'Sistema'}</div>
                     <div class="device-header">
                         <div class="device-name">${escapeHtml(device.name)}</div>
                         <div class="priority-toggle">
@@ -673,14 +1016,17 @@
                         <div class="info-item">
                             <div class="info-label">Distancia</div>
                             <div class="info-value">
-                                <span class="distance-badge ${getDistanceClass(device.distance)}">
-                                    ${device.distance.toFixed(1)} m
+                                <span class="distance-badge ${getDistanceClass(device.distance || 5)}">
+                                    ${(device.distance || 5).toFixed(1)} m
                                 </span>
                             </div>
                         </div>
                         <div class="info-item">
                             <div class="info-label">RSSI</div>
-                            <div class="info-value">${device.rssi} dBm</div>
+                            <div class="info-value">
+                                ${device.rssi} dBm
+                                ${createSignalBars(device.rssi)}
+                            </div>
                         </div>
                         <div class="info-item">
                             <div class="info-label">Última actualización</div>
@@ -707,6 +1053,7 @@
 
             notificationsList.innerHTML = notifications.map(notification => `
                 <div class="notification-item ${notification.eventType}">
+                    <div class="notification-source">${notification.source || 'ESP32'}</div>
                     <div>
                         <strong>${escapeHtml(notification.deviceName)}</strong>
                         ${getNotificationMessage(notification.eventType)}
@@ -722,7 +1069,7 @@
         function updateStats() {
             const totalDevices = devices.size;
             const priorityCount = Array.from(devices.values()).filter(d => d.isPriority).length;
-            const closeDevices = Array.from(devices.values()).filter(d => d.distance <= 2.0).length;
+            const closeDevices = Array.from(devices.values()).filter(d => (d.distance || 5) <= 2.0).length;
 
             document.getElementById('totalDevices').textContent = totalDevices;
             document.getElementById('priorityCount').textContent = priorityCount;
@@ -747,11 +1094,11 @@
                     throw new Error('Error al actualizar prioridad');
                 }
 
-                console.log(`Prioridad actualizada: ${deviceAddress} = ${isPriority}`);
+                console.log(`✅ Prioridad actualizada: ${deviceAddress} = ${isPriority}`);
 
             } catch (error) {
-                console.error('Error:', error);
-                alert('Error al actualizar la prioridad del dispositivo');
+                console.error('❌ Error:', error);
+                showSystemAlert('Error al actualizar la prioridad del dispositivo', 'error');
             }
         }
 
@@ -766,6 +1113,16 @@
             if (distance <= 2) return 'distance-close';
             if (distance <= 5) return 'distance-medium';
             return 'distance-far';
+        }
+
+        function createSignalBars(rssi) {
+            const strength = Math.max(0, Math.min(4, Math.floor((rssi + 100) / 15)));
+            let bars = '<div class="signal-strength">';
+            for (let i = 1; i <= 4; i++) {
+                bars += `<div class="signal-bar ${i <= strength ? 'active' : ''}"></div>`;
+            }
+            bars += '</div>';
+            return bars;
         }
 
         function getNotificationMessage(eventType) {
@@ -783,6 +1140,27 @@
             });
         }
 
+        // Mostrar alerta del sistema
+        function showSystemAlert(message, type = 'warning') {
+            const alertDiv = document.getElementById('systemAlert');
+            const alertMessage = document.getElementById('alertMessage');
+            
+            alertDiv.className = `alert alert-${type}`;
+            alertMessage.textContent = message;
+            alertDiv.style.display = 'flex';
+            
+            // Auto-ocultar después de 10 segundos
+            setTimeout(() => {
+                hideSystemAlert();
+            }, 10000);
+        }
+
+        // Ocultar alerta del sistema
+        function hideSystemAlert() {
+            const alertDiv = document.getElementById('systemAlert');
+            alertDiv.style.display = 'none';
+        }
+
         // Funciones de control
         function refreshDevices() {
             if (socket && isConnected) {
@@ -792,18 +1170,33 @@
             }
         }
 
+        function requestSystemStats() {
+            if (socket && isConnected) {
+                socket.emit('requestSystemStats');
+            }
+        }
+
         async function clearAllPriorities() {
             if (!confirm('¿Estás seguro de que quieres limpiar todas las prioridades?')) {
                 return;
             }
 
             const priorityList = Array.from(priorityDevices);
+            let errors = 0;
+            
             for (const deviceAddress of priorityList) {
                 try {
                     await togglePriority(deviceAddress, false);
                 } catch (error) {
                     console.error('Error limpiando prioridad:', error);
+                    errors++;
                 }
+            }
+            
+            if (errors > 0) {
+                showSystemAlert(`Se limpiaron las prioridades con ${errors} errores`, 'warning');
+            } else {
+                showSystemAlert('Todas las prioridades han sido limpiadas', 'success');
             }
         }
 
@@ -816,10 +1209,13 @@
                 if (response.ok) {
                     notifications = [];
                     renderNotifications();
-                    console.log('Notificaciones limpiadas');
+                    console.log('✅ Notificaciones limpiadas');
+                } else {
+                    throw new Error('Error en el servidor');
                 }
             } catch (error) {
-                console.error('Error limpiando notificaciones:', error);
+                console.error('❌ Error limpiando notificaciones:', error);
+                showSystemAlert('Error al limpiar notificaciones', 'error');
             }
         }
 
@@ -832,10 +1228,36 @@
             // Reconectar automáticamente si se pierde la conexión
             setInterval(() => {
                 if (!isConnected && socket) {
-                    console.log('Intentando reconectar...');
+                    console.log('🔄 Intentando reconectar...');
                     socket.connect();
                 }
             }, 5000);
+        }
+
+        // Iniciar actualizaciones periódicas
+        function startPeriodicUpdates() {
+            // Actualizar datos cada 30 segundos
+            setInterval(() => {
+                if (isConnected) {
+                    refreshDevices();
+                    requestSystemStats();
+                }
+            }, 30000);
+
+            // Verificar estado del sistema cada 60 segundos
+            setInterval(() => {
+                fetch(`${BACKEND_URL}/api/system-stats`)
+                    .then(response => response.json())
+                    .then(data => {
+                        updateSystemStats(data);
+                        if (data.systemHealth) {
+                            updateSystemStatus(data.systemHealth);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error obteniendo estadísticas:', error);
+                    });
+            }, 60000);
         }
 
         // Manejar visibilidad de la página
@@ -843,8 +1265,20 @@
             if (!document.hidden && isConnected) {
                 // Página visible, solicitar datos actualizados
                 refreshDevices();
+                requestSystemStats();
             }
         });
+
+        // Manejar errores globales
+        window.addEventListener('error', function(e) {
+            console.error('Error global:', e.error);
+            showSystemAlert('Se produjo un error inesperado', 'error');
+        });
+
+        // Log inicial
+        console.log('🚀 Monitor BLE Frontend iniciado');
+        console.log('🔗 Backend URL:', BACKEND_URL);
+        console.log('🔧 Versión: 2.0.0 - Sistema ESP32 + Pico W');
     </script>
 </body>
 </html>
